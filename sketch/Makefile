@@ -1,6 +1,5 @@
-# SolarSaver sketch Makefile
+# vsensor sketch Makefile
 
-# Arduino.mk variables
 ARDUINO_DIR			= /opt/arduino
 ARDMK_DIR			= /opt/arduino-mk
 AVR_TOOLS_DIR		= /opt/arduino/hardware/tools/avr
@@ -13,6 +12,8 @@ ARDUINO_PORT		= /dev/ttyACM0
 MONITOR_BAUDRATE	= 9600
 
 include /opt/arduino-mk/Arduino.mk
+
+#PASSWORD ?= $(shell stty -echo; read -p "Password: " pwd; stty echo; echo $$pwd)
 
 realclean: clean
 	rm -f *~

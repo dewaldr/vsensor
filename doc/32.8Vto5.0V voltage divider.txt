@@ -1,0 +1,5 @@
+
+Vin: 	32.78 Volts
+Ra: 	10k Ohms
+Rb: 	1.8k Ohms
+Vout: 	5.0 Volts
