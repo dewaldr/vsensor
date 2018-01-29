@@ -1,107 +1,88 @@
-#include <SPI.h>
-#include <Ethernet.h>
-#include <EthernetUdp.h>
-#include <LowPower.h>
-#define SERIAL_BAUD     115200
+#define MACADDRESS    0x00,0x01,0x02,0x03,0x04,0xA1
+#define MYIPADDR      192,168,11,65
+#define MYIPMASK      255,255,255,0
+#define MYDNS         192,168,11,10
+#define MYGW          192,168,11,1
+#define LISTENPORT    5050
+#define SERIAL_BAUD   115200
+#define MSG_SIZE      32
+
+#include <UIPEthernet.h>
 
 // Site config
 const int siteID = 65;
-const bool isSolar = false;
+const bool isAC = true;
 String passphrase = String("ArduinoNano");
-
-// Network config
-byte macAddress[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xEA };
-IPAddress ipAddress(192, 168, 11, 65);
-const unsigned int localPort = 5050;                // local port to listen on
-char packetBuffer[UDP_TX_PACKET_MAX_SIZE];          // buffer to hold incoming packet,
-EthernetUDP Udp;
 
 // Sensor config
 const int voltagePin = A0;
 const int relayPin   = PD5;
 const int nsamples   = 10;
 
-void powerOn()
-{
-    digitalWrite(relayPin, HIGH);
-}
-
-void powerOff()
-{
-    digitalWrite(relayPin, LOW);
-}
+EthernetServer server = EthernetServer(LISTENPORT);
 
 void setup() {
-    // Setup relay
-    pinMode(relayPin, INPUT_PULLUP);
-    pinMode(relayPin, OUTPUT);
-    powerOff();
 
-    // Disable SD card
-    pinMode(4, OUTPUT);
-    digitalWrite(4, HIGH);
+    uint8_t mac[6] = {MACADDRESS};
+    uint8_t myIP[4] = {MYIPADDR};
+    uint8_t myMASK[4] = {MYIPMASK};
+    uint8_t myDNS[4] = {MYDNS};
+    uint8_t myGW[4] = {MYGW};
 
-    // Start the Ethernet and UDP:
-    Ethernet.begin(macAddress, ipAddress);
-    Udp.begin(localPort);
+    Ethernet.begin(mac,myIP,myDNS,myGW,myMASK);
+
+    server.begin();
 
     Serial.begin(SERIAL_BAUD);
 }
 
 void loop() {
 
-    Serial.flush();
 
-    // Enter idle state
-    LowPower.idle(SLEEP_2S, ADC_OFF, TIMER2_OFF, TIMER1_OFF, TIMER0_OFF, SPI_ON, USART0_OFF, TWI_OFF);
+    if (EthernetClient client = server.available()) 
+    {
+        if (client.available() > 0)  {
+          
+            char msg[MSG_SIZE];
+            memset(msg, 0x00, MSG_SIZE);
+            client.read(msg, MSG_SIZE);
 
-    // Read voltage sensor
-    int analogue = 0;
-    for (int x = 0; x < nsamples; x++) {
-        analogue += analogRead(voltagePin);
-    }
-    float vReading = analogue / nsamples;
-    float vBattery = vReading * (32.2 / 1023);
+            String request = String(msg);
 
-    char relayState = 'N';
-    if (isSolar) {
-        relayState = digitalRead(relayPin) ? 'C' : 'O';
-    }
+            // Compose reply
+            String reply;
 
-    // If network request received, read a packet
-    int packetSize = Udp.parsePacket();
-    if (packetSize) {
+            if (request.startsWith(passphrase)) {
 
-        IPAddress remoteIP = Udp.remoteIP();
-        unsigned int remotePort = Udp.remotePort();
+                // Read voltage sensor
+                int analogue = 0;
+                for (int x = 0; x < nsamples; x++) {
+                    analogue += analogRead(voltagePin);
+                }
+                float vReading = analogue / nsamples;
+                float vBattery = vReading * (32.2 / 1023);
 
-        // read the packet into packetBufffer
-        Udp.read(packetBuffer, UDP_TX_PACKET_MAX_SIZE);
+                char relayState = 'N';
+                if (isAC) {
+                    relayState = digitalRead(relayPin) ? 'C' : 'O';
+                }
 
-        String request = String(packetBuffer);
+                reply = String(siteID, DEC) + "," + String(isAC ? "A" : "S") + "," + relayState + "," + String(vReading, 2) + "," + String(vBattery, 2);
+            }
+            else {
+                reply = "ERROR";
+            }
 
-        // TODO: verify input
+            // DEBUG
+            Serial.print("Request: ");
+            Serial.println(request);
+            Serial.print("Reply: ");
+            Serial.println(reply);
 
-        // Compose reply
-        String reply;
+            client.write(reply.c_str(), reply.length());
 
-        if (request.startsWith(passphrase)) {
-            reply = (String(siteID, DEC) + "," + String(isSolar ? "S" : "A") + \
-            "," + relayState + "," + String(vReading, 2) + "," + String(vBattery, 2));
         }
-        else {
-            reply = "ERROR";
-        }
-
-        // DEBUG
-        Serial.print("Request: ");
-        Serial.println(packetBuffer);
-        Serial.print("Reply: ");
-        Serial.println(reply);
-
-        // Send a reply to the IP address and port that sent us the packet we received
-        Udp.beginPacket(remoteIP, remotePort);
-        Udp.write(reply.c_str());
-        Udp.endPacket();
+        client.stop();
     }
 }
+
