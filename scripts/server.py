@@ -1,36 +1,19 @@
+#!/usr/bin/python
+
 import socket
-import sys
 
-HOST = ''
-PORT = 9091
+host = ''
+port = 5050
+backlog = 5
+size = 1024
 
-try :
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    print 'Socket created'
-except socket.error, msg :
-    print 'Failed to create socket. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
-    sys.exit()
-
-
-try:
-    s.bind((HOST, PORT))
-except socket.error , msg:
-    print 'Bind failed. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
-    sys.exit()
-
-print 'Socket bind complete'
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.bind((host,port))
+s.listen(backlog)
 
 while 1:
-    d = s.recvfrom(1024)
-    data = d[0]
-    addr = d[1]
-
-    if not data:
-        break
-
-    reply = 'OK...' + data
-
-    s.sendto(reply , addr)
-    print 'Message[' + addr[0] + ':' + str(addr[1]) + '] - ' + data.strip()
-
-s.close()
+    client, address = s.accept()
+    data = client.recv(size)
+    if data:
+        client.send(data)
+    client.close()

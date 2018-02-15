@@ -1,16 +1,15 @@
 #include <UIPEthernet.h>
 //#include <LowPower.h>
 
-#define LISTENPORT      5050
-#define MSG_SIZE        32
-#define SERIAL_BAUD     115200
+#define LISTENPORT    5050
+#define MAX_MSG_SIZE  128
+#define SERIAL_BAUD   115200
 
 // TODO: store site config in EEPROM
 // Site config
-const int siteID = 65;
-const bool isAC = false;
-const bool debug = true;
-String passphrase = String("ArduinoNano");
+const int siteID     = 65;
+const bool debug     = true;
+String passphrase    = String("ArduinoNano");
 
 // Sensor config
 const int voltagePin = A0;
@@ -20,21 +19,38 @@ const int nsamples   = 10;    // Number of times to read analogue sensors
 // Global server object
 EthernetServer server = EthernetServer(LISTENPORT);
 
-void powerOn() {
+void relayOn() {
     digitalWrite(relayPin, HIGH);
 }
 
-void powerOff() {
+void relayOff() {
     digitalWrite(relayPin, LOW);
+}
+
+void relayToggle() {
+
+    if (digitalRead(relayPin)) {
+        relayOff();
+    }
+    else {
+        relayOn();
+    }
+}
+
+char relayState() {
+    char rState = digitalRead(relayPin) ? 'C' : 'O';
+
+    return rState;
 }
 
 float readVoltage() {
     int total = 0;
     for (int x = 0; x < nsamples; x++) {
         total += analogRead(voltagePin);
+        delay(4);
     }
 
-    return ((total / nsamples) * (32.2 / 1024));
+    return ((total / nsamples) * (32.11 / 1023)) - 0.1;
 }
 
 void startLog() {
@@ -54,14 +70,14 @@ void setup() {
     // Setup relay
     pinMode(relayPin, INPUT_PULLUP);
     pinMode(relayPin, OUTPUT);
-    powerOff();
+    relayOff();
 
     // TODO: store network config in EEPROM
-    uint8_t mac[6] = {0x00,0x01,0x02,0x03,0x04,0xA1};
-    uint8_t myIP[4] = {192,168,11,65};
+    uint8_t mac[6]    = {0x00,0x01,0x02,0x03,0x04,0xA1};
+    uint8_t myIP[4]   = {192,168,11,65};
     uint8_t myMASK[4] = {255,255,255,0};
-    uint8_t myDNS[4] = {192,168,11,10};
-    uint8_t myGW[4] = {192,168,11,10};
+    uint8_t myDNS[4]  = {192,168,11,10};
+    uint8_t myGW[4]   = {192,168,11,10};
 
     Ethernet.begin(mac,myIP,myDNS,myGW,myMASK);
     server.begin();
@@ -80,9 +96,11 @@ void loop() {
     {
         if (client.available() > 0)  {
 
-            char msg[MSG_SIZE];
-            memset(msg, 0x00, MSG_SIZE);
-            client.read(msg, MSG_SIZE);
+            char msg[MAX_MSG_SIZE];
+            memset(msg, 0x00, MAX_MSG_SIZE);
+            client.read(msg, MAX_MSG_SIZE);
+            // Ensure the message is null terminated
+            msg[MAX_MSG_SIZE] = 0x00;
 
             // TODO: verify input
             String request = String(msg);
@@ -90,22 +108,36 @@ void loop() {
             // Compose reply
             String reply;
 
-            if (request.startsWith(passphrase)) {
+            if (request.startsWith(passphrase) && request.endsWith(".")) {
 
-                // Read voltage sensor
-                float vBattery = readVoltage();
-
-                // Determine state of relay: C = closed, O = open, N = not active
-                char relayState = 'N';
-                if (isAC) {
-                    relayState = digitalRead(relayPin) ? 'C' : 'O';
+                // Parse query
+                char command = 'N';
+                int index = request.indexOf(',');
+                if (index > 0) {
+                    command = request.charAt(index + 1);
                 }
 
-                // SiteID, SiteType, RelayState, BatteryVoltage
-                reply = String(siteID, DEC) + "," + String(isAC ? "A" : "S") + "," + relayState + "," + String(vBattery, 2);
+                // Commands: Q = query state, T = toggle relay, N = unknown
+                switch (command) {
+                    case 'Q': 
+
+                        // siteID, relayState, batteryVoltage
+                        reply = String(siteID, DEC) + "," + String(relayState()) + "," + String(readVoltage(), 1) + ".";
+                        break;
+
+                    case 'T':
+                        relayToggle();
+                        reply = String(siteID, DEC) + ",COMMAND-OK.";
+                        break;
+
+                    default:
+                        reply = String(siteID, DEC) + ",COMMAND-ERROR.";
+                        break;
+                }
+
             }
             else {
-                reply = String(siteID, DEC) + ",ERROR";
+                reply = String(siteID, DEC) + ",GENERAL-ERROR.";
             }
 
             writeLog("Request: " + request);
@@ -117,5 +149,3 @@ void loop() {
         client.stop();
     }
 }
-
-

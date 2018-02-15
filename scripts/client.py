@@ -1,33 +1,42 @@
 #!/usr/bin/python
+import socket
+import sys
 
-import time
-from socket import *
+# Global options container
+class Opts(object):
+    pass
 
-max_retries = 5
-retried = 0
-retry = True
+opts = Opts()
 
-while (retry):
-    clientSocket = socket(AF_INET, SOCK_DGRAM)
-    clientSocket.settimeout(3)
+def main():
 
-    # Encode message
-    message = 'ArduinoNano,Q'
-    addr = ("192.168.11.65", 5050)
-
-    clientSocket.sendto(message, addr)
+    sock = socket.create_connection((opts.ip, opts.port))
 
     try:
-        data, server = clientSocket.recvfrom(1024)
-        print '%s' % (data)
-        retry = False
+        # Send data
+        message = '%s,%s.' % (opts.auth, opts.command)
+        print 'sending "%s"' % message
+        sock.sendall(message)
 
-    except timeout:
-        retried += 1
-        if (retried < max_retries):
-            time.sleep(1)
-        else:
-            print 'Error: request failed'
-            retry = False
+        # Recieve data
+        data = sock.recv(32)
+        print 'received "%s"' % data
 
+    finally:
+        print 'closing socket'
+        sock.close()
+
+if __name__ == '__main__':
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    #parser.add_argument("-v", "--verbose", action="store_true", help="Show verbose output")
+    parser.add_argument("-i", "--ip", type=str, required=True, help="Sensor IP address")
+    parser.add_argument("-p", "--port", type=int, default=5050, help="Sensor TCP port")
+    parser.add_argument("-a", "--auth", type=str, default="ArduinoNano", help="Sensor authentication password")
+    parser.add_argument("-c", "--command", type=str, default="Q", help="Sensor command")
+
+    parser.parse_args(namespace=opts)
+
+    main()
 
