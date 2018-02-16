@@ -26,7 +26,16 @@ def isfloat(value):
 def main():
 
     exitCode = NAGIOS_UNKNOWN
-    sock = socket.create_connection((opts.ip, opts.port))
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(5)
+
+    try:
+        sock = socket.create_connection((opts.ip, opts.port))
+
+    except socket.error, msg:
+        # print "Connection error: %s\n" % msg
+        sys.exit(exitCode)
 
     try:
         request = '%s,%s.' % (opts.auth, opts.command)
@@ -49,6 +58,9 @@ def main():
                 exitCode = NAGIOS_CRITICAL
             else:
                 exitCode = NAGIOS_OK
+    except:
+        pass
+
     finally:
         sock.close()
 
@@ -59,11 +71,11 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--ip", type=str, required=True, help="Sensor IP address")
-    parser.add_argument("-p", "--port", type=int, default=5050, help="Sensor TCP port")
+    parser.add_argument("-p", "--port", type=int, default=5050, help="Sensor TCP port [5050]")
     parser.add_argument("-a", "--auth", type=str, default="ArduinoNano", help="Sensor authentication password")
-    parser.add_argument("-o", "--command", type=str, default="Q", help="Sensor command")
-    parser.add_argument("-c", "--critical", type=float, default=23.1, help="Critical voltage level")
-    parser.add_argument("-w", "--warning", type=float, default=23.9, help="Warning voltage level")
+    parser.add_argument("-o", "--command", type=str, default="Q", help="Sensor command [Q]")
+    parser.add_argument("-c", "--critical", type=float, default=23.1, help="Critical voltage level [23.1]")
+    parser.add_argument("-w", "--warning", type=float, default=23.9, help="Warning voltage level [23.9]")
 
     parser.parse_args(namespace=opts)
 
