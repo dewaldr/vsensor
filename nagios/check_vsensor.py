@@ -34,7 +34,7 @@ def main():
         sock = socket.create_connection((opts.ip, opts.port))
 
     except socket.error, msg:
-        # print "Connection error: %s\n" % msg
+        print "Network connection error: %s" % msg
         sys.exit(exitCode)
 
     try:
@@ -53,13 +53,16 @@ def main():
                 voltage = float(data[2])
 
             if ((voltage <= opts.warning) and (voltage > opts.critical)):
+                print "Sensed voltage WARNING: %.1f" % voltage
                 exitCode = NAGIOS_WARNING
             elif (voltage <= opts.critical):
+                print "Sensed voltage CRITICAL: %.1f" % voltage
                 exitCode = NAGIOS_CRITICAL
             else:
+                print "Sensed voltage OK: %.1f" % voltage
                 exitCode = NAGIOS_OK
     except:
-        pass
+        "Network send/receive error"
 
     finally:
         sock.close()
