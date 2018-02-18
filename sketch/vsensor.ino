@@ -2,7 +2,7 @@
 //#include <LowPower.h>
 
 #define LISTENPORT    5050
-#define MAX_MSG_SIZE  128
+#define MAX_MSG_SIZE  254
 #define SERIAL_BAUD   115200
 
 // TODO: store site config in EEPROM
@@ -106,9 +106,9 @@ void loop() {
             String request = String(msg);
 
             // Compose reply
-            String reply;
+            String reply = "siteid:" + String(siteID, DEC) + ",";
 
-            if (request.startsWith(passphrase) && request.endsWith(".")) {
+            if (request.startsWith(passphrase) && request.endsWith("#")) {
 
                 // Parse query
                 char command = 'N';
@@ -117,34 +117,31 @@ void loop() {
                     command = request.charAt(index + 1);
                 }
 
+
                 // Commands: Q = query state, T = toggle relay, N = unknown
                 switch (command) {
                     case 'Q': 
-
-                        // siteID, relayState, batteryVoltage
-                        reply = String(siteID, DEC) + "," + String(relayState()) + "," + String(readVoltage(), 1) + ".";
+                        reply += "status:query_ok,relay:" + String(relayState()) + ",voltage:" + String(readVoltage(), 1) + "#";
                         break;
 
                     case 'T':
                         relayToggle();
-                        reply = String(siteID, DEC) + ",COMMAND-OK.";
+                        reply += "status:command_ok#";
                         break;
 
                     default:
-                        reply = String(siteID, DEC) + ",COMMAND-ERROR.";
+                        reply += "status:command_error#";
                         break;
                 }
-
             }
             else {
-                reply = String(siteID, DEC) + ",GENERAL-ERROR.";
+                reply = "status:general_error#";
             }
 
             writeLog("Request: " + request);
             writeLog("Reply: " + reply);
 
             client.write(reply.c_str(), reply.length());
-
         }
         client.stop();
     }

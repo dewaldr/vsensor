@@ -2,7 +2,7 @@
 import socket
 import sys
 
-MAX_MSG_SIZE = 128
+MAX_MSG_SIZE = 254
 
 # Nagios exit codes
 NAGIOS_OK       = 0
@@ -38,29 +38,49 @@ def main():
         sys.exit(exitCode)
 
     try:
-        request = '%s,%s.' % (opts.auth, opts.command)
+        request = '%s,%s#' % (opts.auth, opts.command)
         sock.sendall(request)
 
         response = sock.recv(MAX_MSG_SIZE)
 
-        if ((len(response) > 4) and response.endswith('.')):
+        if ((len(response) > 4) and response.endswith('#')):
 
-            # Drop trailing '.' and split
+            # Drop trailing '#' and split
             data = (response[:-1]).split(',')
+            siteid = 'N'
+            status = 'unknown'
+            relay = 'N'
             voltage = 0.0
 
-            if (isfloat(data[2])):
-                voltage = float(data[2])
+            for taggedvalue in data:
+                reading = taggedvalue.split(':')
+                if reading[0] == 'siteid':
+                    siteid = int(reading[1])
+                elif reading[0] == 'status':
+                    status = reading[1]
+                elif reading[0] == 'relay':
+                    relay = reading[1]
+                elif reading[0] == 'voltage':
+                    voltage = float(reading[1])
+                #else TODO: handle garbage input
 
-            if ((voltage <= opts.warning) and (voltage > opts.critical)):
-                print "Sensed voltage WARNING: %.1f" % voltage
+
+            if (status != "query_ok"):
+                print "Sensor query error"
+                exitCode = NAGIOS_UNKNOWN
+
+            elif ((voltage <= opts.warning) and (voltage > opts.critical)):
+                print "SiteID: %d, voltage WARNING: %.1f" % (siteid, voltage)
                 exitCode = NAGIOS_WARNING
+
             elif (voltage <= opts.critical):
-                print "Sensed voltage CRITICAL: %.1f" % voltage
+                print "SiteID: %d, voltage CRITICAL: %.1f" % (siteid, voltage)
                 exitCode = NAGIOS_CRITICAL
+
             else:
-                print "Sensed voltage OK: %.1f" % voltage
+                print "SiteID: %d, voltage OK: %.1f" % (siteid, voltage)
                 exitCode = NAGIOS_OK
+
     except:
         "Network send/receive error"
 

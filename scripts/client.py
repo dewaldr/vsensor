@@ -22,12 +22,12 @@ def main():
 
     try:
         # Send data
-        message = '%s,%s.' % (opts.auth, opts.command)
+        message = '%s,%s#' % (opts.auth, opts.command)
         print "Sending %s" % message
         sock.sendall(message)
 
         # Recieve data
-        data = sock.recv(32)
+        data = sock.recv(128)
         print "Received %s" % data
 
     except:
