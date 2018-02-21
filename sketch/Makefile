@@ -11,6 +11,3 @@ TARGET			= vsensor
 
 include $(ARDMK_DIR)/Arduino.mk
 
-realclean:	clean
-	rm -rf build-*
-

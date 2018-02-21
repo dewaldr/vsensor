@@ -1,15 +1,13 @@
 #include <UIPEthernet.h>
-//#include <LowPower.h>
 
 #define LISTENPORT    5050
-#define MAX_MSG_SIZE  254
+#define MAX_MSG_SIZE  128
 #define SERIAL_BAUD   115200
 
 // TODO: store site config in EEPROM
 // Site config
-const int siteID     = 65;
-const bool debug     = true;
-String passphrase    = String("ArduinoNano");
+const bool debug  = true;
+String deviceauth("ArduinoNano");
 
 // Sensor config
 const int voltagePin = A0;
@@ -37,10 +35,8 @@ void relayToggle() {
     }
 }
 
-char relayState() {
-    char rState = digitalRead(relayPin) ? 'C' : 'O';
-
-    return rState;
+String relayState() {
+    return (digitalRead(relayPin) ? "closed" : "open");
 }
 
 float readVoltage() {
@@ -65,6 +61,22 @@ void writeLog(const String& msg) {
     if (debug) { Serial.println(msg); }
 }
 
+String getSnippet(const String& data, const char separator, int index) {
+    int found = 0;
+    int strIndex[] = {0, -1};
+    int maxIndex = data.length() - 1;
+
+    for (int i = 0; i <= maxIndex && found <= index; i++) {
+        if ((data.charAt(i) == separator) || (i == maxIndex)) {
+            found++;
+            strIndex[0] = strIndex[1] + 1;
+            strIndex[1] = (i == maxIndex) ? i + 1 : i;
+        }
+    }
+
+    return (found > index ? data.substring(strIndex[0], strIndex[1]) : "");
+}
+
 void setup() {
 
     // Setup relay
@@ -73,11 +85,11 @@ void setup() {
     relayOff();
 
     // TODO: store network config in EEPROM
-    uint8_t mac[6]    = {0x00,0x01,0x02,0x03,0x04,0xA1};
+    uint8_t mac[6]    = {0x00,0x01,0x02,0x03,0x04,0xA0};
     uint8_t myIP[4]   = {192,168,11,65};
     uint8_t myMASK[4] = {255,255,255,0};
     uint8_t myDNS[4]  = {192,168,11,10};
-    uint8_t myGW[4]   = {192,168,11,10};
+    uint8_t myGW[4]   = {192,168,11,1};
 
     Ethernet.begin(mac,myIP,myDNS,myGW,myMASK);
     server.begin();
@@ -89,56 +101,49 @@ void loop() {
 
     flushLog();
 
-    // Enter idle state
-    // LowPower.idle(SLEEP_2S, ADC_OFF, TIMER2_OFF, TIMER1_OFF, TIMER0_OFF, SPI_ON, USART0_OFF, TWI_OFF);
-
     if (EthernetClient client = server.available()) 
     {
         if (client.available() > 0)  {
 
             char msg[MAX_MSG_SIZE];
-            memset(msg, 0x00, MAX_MSG_SIZE);
+            memset(msg, '\0', MAX_MSG_SIZE);
             client.read(msg, MAX_MSG_SIZE);
-            // Ensure the message is null terminated
-            msg[MAX_MSG_SIZE] = 0x00;
+            msg[MAX_MSG_SIZE - 1] = '\0';
 
-            // TODO: verify input
-            String request = String(msg);
+            String request(msg);
+            int reqlen = request.length();
+            writeLog("Request: " + request);
 
-            // Compose reply
-            String reply = "siteid:" + String(siteID, DEC) + ",";
+            String reply;
 
-            if (request.startsWith(passphrase) && request.endsWith("#")) {
+            if (request.endsWith("#") && reqlen > 10) {
+                request.remove(reqlen - 1);
+                String authsnip = getSnippet(request, ',', 0);
+                String auth = getSnippet(authsnip, ':', 1);
 
-                // Parse query
-                char command = 'N';
-                int index = request.indexOf(',');
-                if (index > 0) {
-                    command = request.charAt(index + 1);
-                }
+                if (auth.compareTo(deviceauth) == 0) {
+                    String cmdsnip = getSnippet(request, ',', 1);
+                    String cmd = getSnippet(cmdsnip, ':', 1);
 
-
-                // Commands: Q = query state, T = toggle relay, N = unknown
-                switch (command) {
-                    case 'Q': 
-                        reply += "status:query_ok,relay:" + String(relayState()) + ",voltage:" + String(readVoltage(), 1) + "#";
-                        break;
-
-                    case 'T':
+                    if (cmd.compareTo("query") == 0) {
+                        reply = "status:query_ok,relay:" + String(relayState()) + ",voltage:" + String(readVoltage(), 1) + "#";
+                    }
+                    else if (cmd.compareTo("toggle") == 0) {
                         relayToggle();
-                        reply += "status:command_ok#";
-                        break;
-
-                    default:
-                        reply += "status:command_error#";
-                        break;
+                        reply = "status:command_ok#";
+                    }
+                    else {
+                        reply = "status:command_error#";
+                    }
+                }
+                else {
+                    reply = "status:auth_error#";
                 }
             }
             else {
                 reply = "status:general_error#";
             }
 
-            writeLog("Request: " + request);
             writeLog("Reply: " + reply);
 
             client.write(reply.c_str(), reply.length());

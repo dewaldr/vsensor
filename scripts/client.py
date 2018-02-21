@@ -22,7 +22,7 @@ def main():
 
     try:
         # Send data
-        message = '%s,%s#' % (opts.auth, opts.command)
+        message = 'auth:%s,command:%s#' % (opts.auth, opts.command)
         print "Sending %s" % message
         sock.sendall(message)
 
@@ -45,7 +45,7 @@ if __name__ == '__main__':
     parser.add_argument("-i", "--ip", type=str, required=True, help="Sensor IP address")
     parser.add_argument("-p", "--port", type=int, default=5050, help="Sensor TCP port")
     parser.add_argument("-a", "--auth", type=str, default="ArduinoNano", help="Sensor authentication password")
-    parser.add_argument("-c", "--command", type=str, default="Q", help="Sensor command")
+    parser.add_argument("-c", "--command", type=str, default="query", help="Sensor command")
 
     parser.parse_args(namespace=opts)
 
