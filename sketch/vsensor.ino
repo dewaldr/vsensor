@@ -4,6 +4,8 @@
 #define MAX_MSG_SIZE  128
 #define SERIAL_BAUD   115200
 
+String version("v0.2");
+
 // TODO: store site config in EEPROM
 // Site config
 const bool debug  = true;
@@ -86,10 +88,10 @@ void setup() {
 
     // TODO: store network config in EEPROM
     uint8_t mac[6]    = {0x00,0x01,0x02,0x03,0x04,0xA0};
-    uint8_t myIP[4]   = {192,168,11,65};
+    uint8_t myIP[4]   = {192,168,1,65};
     uint8_t myMASK[4] = {255,255,255,0};
-    uint8_t myDNS[4]  = {192,168,11,10};
-    uint8_t myGW[4]   = {192,168,11,1};
+    uint8_t myDNS[4]  = {192,168,1,1};
+    uint8_t myGW[4]   = {192,168,1,1};
 
     Ethernet.begin(mac,myIP,myDNS,myGW,myMASK);
     server.begin();
@@ -127,6 +129,9 @@ void loop() {
 
                     if (cmd.compareTo("query") == 0) {
                         reply = "status:query_ok,relay:" + String(relayState()) + ",voltage:" + String(readVoltage(), 1) + "#";
+                    }
+                    else if (cmd.compareTo("version") == 0) {
+                        reply = "status:command_ok,version:" + version + "#";
                     }
                     else if (cmd.compareTo("toggle") == 0) {
                         relayToggle();
