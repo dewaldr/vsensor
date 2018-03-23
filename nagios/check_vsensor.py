@@ -1,6 +1,7 @@
 #!/usr/bin/python
 import socket
 import sys
+import select
 
 MAX_MSG_SIZE = 128
 
@@ -27,62 +28,75 @@ def main():
 
     exitCode = NAGIOS_UNKNOWN
 
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.settimeout(5)
-
     try:
-        sock = socket.create_connection((opts.ip, opts.port))
-
-    except socket.error, msg:
-        print "Network connection error: %s" % msg
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5.0)
+    except socket.error, exc:
+        print "Socket setup error: %s\n" % exc
         sys.exit(exitCode)
 
-    try:
-        request = 'auth:%s,command:%s#' % (opts.auth, opts.command)
-        sock.sendall(request)
+    response = ""
+    retry = 0
+    while (retry < opts.retries):
+        retry += 1
+        try:
+            sock = socket.create_connection((opts.ip, opts.port))
 
-        response = sock.recv(MAX_MSG_SIZE)
+        except socket.error, exc:
+            print "Network connection error: %s" % exc
+            sys.exit(exitCode)
 
-        if ((len(response) > 10) and response.endswith('#')):
+        try:
+            request = 'auth:%s,command:%s#' % (opts.auth, opts.command)
+            sock.sendall(request)
 
-            # Drop trailing '#' and split
-            data = (response[:-1]).split(',')
-            status = 'unknown'
-            relay = 'unknown'
-            voltage = 0.0
+            # Wait until data available, then receive
+            sock.setblocking(0)
+            ready = select.select([sock], [], [], 5)
+            if ready[0]:
+                response = sock.recv(MAX_MSG_SIZE)
+                break
 
-            for snippet in data:
-                reading = snippet.split(':')
-                if reading[0] == 'status':
-                    status = reading[1]
-                elif reading[0] == 'relay':
-                    relay = reading[1]
-                elif reading[0] == 'voltage':
-                    voltage = float(reading[1])
-                else:
-                    status = "response_error"
+        except socket.error, exc:
+            print "Network comms error: %s" % exc
 
-            if (status != "query_ok"):
-                print "Sensor query error: %s" % status
-                exitCode = NAGIOS_UNKNOWN
+        finally:
+            sock.close()
 
-            elif ((voltage <= opts.warning) and (voltage > opts.critical)):
-                print "voltage WARNING: %.1f" % voltage
-                exitCode = NAGIOS_WARNING
+    if ((len(response) > 10) and response.endswith('#')):
 
-            elif (voltage <= opts.critical):
-                print "voltage CRITICAL: %.1f" % voltage
-                exitCode = NAGIOS_CRITICAL
+        # Drop trailing '#' and split
+        data = (response[:-1]).split(',')
+        status = 'unknown'
+        relay = 'unknown'
+        voltage = 0.0
 
+        for snippet in data:
+            reading = snippet.split(':')
+            if reading[0] == 'status':
+                status = reading[1]
+            elif reading[0] == 'relay':
+                relay = reading[1]
+            elif reading[0] == 'voltage':
+                voltage = float(reading[1])
             else:
-                print "voltage OK: %.1f" % voltage
-                exitCode = NAGIOS_OK
+                status = "response_error"
 
-    except:
-        "Network comms error"
+        if (status != "query_ok"):
+            print "Sensor query error: %s" % status
+            exitCode = NAGIOS_UNKNOWN
 
-    finally:
-        sock.close()
+        elif ((voltage <= opts.warning) and (voltage > opts.critical)):
+            print "voltage WARNING: %.1f" % voltage
+            exitCode = NAGIOS_WARNING
+
+        elif (voltage <= opts.critical):
+            print "voltage CRITICAL: %.1f" % voltage
+            exitCode = NAGIOS_CRITICAL
+
+        else:
+            print "voltage OK: %.1f" % voltage
+            exitCode = NAGIOS_OK
 
     sys.exit(exitCode)
 
@@ -94,6 +108,7 @@ if __name__ == '__main__':
     parser.add_argument("-p", "--port", type=int, default=5050, help="Sensor TCP port [5050]")
     parser.add_argument("-a", "--auth", type=str, default="ArduinoNano", help="Sensor authentication password")
     parser.add_argument("-o", "--command", type=str, default="query", help="Sensor command [query]")
+    parser.add_argument("-r", "--retries", type=int, default="3", help="# of times to retry")
     parser.add_argument("-c", "--critical", type=float, default=23.1, help="Critical voltage level [23.0]")
     parser.add_argument("-w", "--warning", type=float, default=23.9, help="Warning voltage level [23.9]")
 

@@ -4,9 +4,13 @@
 #define MAX_MSG_SIZE  128
 #define SERIAL_BAUD   115200
 
-String version("v0.2");
+String version("v0.2.1");
 
-// TODO: store site config in EEPROM
+// TODO: - better detection for marformed commands
+//       - XTEA encryption
+//       - store site config in EEPROM
+//       - store network config in EEPROM
+
 // Site config
 const bool debug  = true;
 String deviceauth("ArduinoNano");
