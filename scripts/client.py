@@ -20,7 +20,7 @@ def main():
 
     retry = 0
     while (retry < opts.retries):
-        retry += 1
+        retry = retry + 1
         print "Try %d" % retry
         try:
             sock = socket.create_connection((opts.ip, opts.port))

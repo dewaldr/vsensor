@@ -69,6 +69,7 @@ def main():
         data = (response[:-1]).split(',')
         status = 'unknown'
         relay = 'unknown'
+        temperature = 0.0
         voltage = 0.0
 
         for snippet in data:
@@ -77,6 +78,8 @@ def main():
                 status = reading[1]
             elif reading[0] == 'relay':
                 relay = reading[1]
+            elif reading[0] == 'temperature':
+                temperature = float(reading[1])
             elif reading[0] == 'voltage':
                 voltage = float(reading[1])
             else:
@@ -87,15 +90,15 @@ def main():
             exitCode = NAGIOS_UNKNOWN
 
         elif ((voltage <= opts.warning) and (voltage > opts.critical)):
-            print "voltage WARNING: %.1f" % voltage
+            print "temperature: %.1f, voltage WARNING: %.1f" % (temperature, voltage)
             exitCode = NAGIOS_WARNING
 
         elif (voltage <= opts.critical):
-            print "voltage CRITICAL: %.1f" % voltage
+            print "temperature: %.1f, voltage CRITICAL: %.1f" % (temperature, voltage)
             exitCode = NAGIOS_CRITICAL
 
         else:
-            print "voltage OK: %.1f" % voltage
+            print "temperature: %.1f, voltage OK: %.1f" % (temperature, voltage)
             exitCode = NAGIOS_OK
 
     sys.exit(exitCode)
