@@ -1,11 +1,9 @@
-#include <OneWire.h>
-#include <DS18B20.h>
 #include "utils.h"
 
-#define FW_VERSION    "0.4"
-#define ONE_WIRE_BUS  2
+#define FW_VERSION    "0.5"
 #define SERIAL_BAUD   115200
-#define MAX_MSG_SIZE   128
+#define MAX_MSG_SIZE  128
+#define CVOLTAGE      30.3
 
 // Globals - tsk, tsk
 String __input = "";          // a string to hold incoming data
@@ -13,34 +11,7 @@ boolean __inputDone = false;  // whether the input is complete
 
 // Sensor config
 const int voltagePin = A0;
-const int relayPin   = PD5;
-const int tempPin    = PD2;
 const int nsamples   = 10;    // Number of times to read analogue sensors
-
-OneWire oneWire(ONE_WIRE_BUS);
-DS18B20 sensors(&oneWire);
-
-void relayOn() {
-    digitalWrite(relayPin, HIGH);
-}
-
-void relayOff() {
-    digitalWrite(relayPin, LOW);
-}
-
-void relayToggle() {
-
-    if (digitalRead(relayPin)) {
-        relayOff();
-    }
-    else {
-        relayOn();
-    }
-}
-
-uint8_t relayState() {
-    return (digitalRead(relayPin));
-}
 
 float readVoltage() {
     int total = 0;
@@ -49,14 +20,7 @@ float readVoltage() {
         delay(4);
     }
 
-    return ((total / nsamples) * (33.0 / 1023));
-}
-
-float readTemp() {
-    sensors.requestTemperatures();
-    //delay(200);
-    while (!sensors.isConversionComplete()); // wait until sensor is ready
-    return sensors.getTempC();
+    return ((total / nsamples) * (CVOLTAGE / 1024));
 }
 
 /*
@@ -82,13 +46,6 @@ void serialEvent() {
 
 void setup() {
 
-    // Setup relay
-    pinMode(relayPin, INPUT_PULLUP);
-    pinMode(relayPin, OUTPUT);
-    relayOff();
-
-    sensors.begin();
-
     Serial.begin(SERIAL_BAUD);
     __input.reserve(MAX_MSG_SIZE);
 
@@ -113,19 +70,13 @@ void loop() {
             String cmd = getValue(cmdsnip, ':', 1);
 
             if (cmd.compareTo("query") == 0) {
-                // Work around embedded sprintf
-                char temperature[5];
-                dtostrf(readTemp(), 2, 1, temperature);
+                // Work around broken embedded sprintf
                 char voltage[5];
                 dtostrf(readVoltage(), 2, 1, voltage);
-                sprintf(reply, "status:query_ok,relay:%d,temperature:%s,voltage:%s#", relayState(), temperature, voltage);
+                sprintf(reply, "status:query_ok,voltage:%s#", voltage);
             }
             else if (cmd.compareTo("version") == 0) {
                 sprintf("status:command_ok,version:%s#", FW_VERSION);
-            }
-            else if (cmd.compareTo("toggle") == 0) {
-                relayToggle();
-                sprintf(reply, "status:command_ok#");
             }
             else {
                 sprintf(reply, "status:command_error#");

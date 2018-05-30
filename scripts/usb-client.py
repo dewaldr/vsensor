@@ -14,9 +14,7 @@ ser.baudrate = 115200
 ser.bytesize = serial.EIGHTBITS #number of bits per bytes
 ser.parity = serial.PARITY_NONE #set parity check: no parity
 ser.stopbits = serial.STOPBITS_ONE #number of stop bits
-#ser.timeout = None          #block read
-ser.timeout = 1            #non-block read
-#ser.timeout = 2              #timeout block read
+ser.timeout = 2              #timeout block read
 ser.xonxoff = False     #disable software flow control
 ser.rtscts = False     #disable hardware (RTS/CTS) flow control
 ser.dsrdtr = False       #disable hardware (DSR/DTR) flow control
@@ -34,13 +32,11 @@ if ser.isOpen():
         ser.flushInput()
         ser.flushOutput()
 
-        time.sleep(1)  #give the serial port sometime to receive the data
         response = ser.readline()
-        time.sleep(1)  #give the serial port sometime to receive the data
         #write data
         print("write data: command:query#")
         ser.write("command:query#\r")
-        time.sleep(1)  #give the serial port sometime to receive the data
+        time.sleep(1)  #give the serial port time to receive the data
 
         response = ser.readline()
         print("read data: " + response)

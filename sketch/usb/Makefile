@@ -7,7 +7,7 @@ BOARD_SUB		= atmega328
 ARDUINO_PORT 	= /dev/ttyUSB0
 MONITOR_PORT	= /dev/ttyUSB0
 MONITOR_BAUDRATE = 115200
-TARGET			= vsensor-usb
+TARGET			= vsensor
 
 include $(ARDMK_DIR)/Arduino.mk
 
